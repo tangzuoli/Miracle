@@ -68,9 +68,7 @@ class TimeAwareAttention(nn.Module):
 
         position_ids = torch.arange(seq_output.size(1), dtype=torch.long, device=seq_output.device)
         position_ids = position_ids.view(1, -1, 1)
-        # position_ids = position_ids.unsqueeze(0).repeat(seq_output.size()[0], 1)
         position_embedding = self.position_embedding(position_ids)
-        # tma_inputs = position_embedding
         tma_inputs = position_embedding + seq_output
         tma_weight = self.attn_linear(tma_inputs).squeeze(-1) / self.tau
 
@@ -122,7 +120,6 @@ class MoERouteLayer(nn.Module):
         item_moe_emb = item_moe_emb.unsqueeze(2)
 
         bij = gates  # bs * len * aspects
-        # bij = torch.randn(size=[batch_size, seq_len, self.aspects], device=self.device)
         interest_capsule = self.aspect_embs.weight.unsqueeze(0).repeat(batch_size, 1, 1)  # bs * aspects * hiddens
         for i in range(self.caps_layers):
             seq_mask = item_seq == 0
@@ -132,13 +129,11 @@ class MoERouteLayer(nn.Module):
             interest_capsule = torch.sum(
                 cij.unsqueeze(-1) * item_moe_emb * tma_weight.unsqueeze(-1),
                 dim=1)  # batch_size * ins * hidden_size
-            # interest_capsule = interest_capsule + self.aspect_embs.weight.unsqueeze(0).repeat(batch_size, 1, 1)
 
             cap_norm = torch.sum(torch.pow(interest_capsule, 2), dim=-1, keepdim=True)
             scalar_factor = cap_norm / (1 + cap_norm) / torch.sqrt(cap_norm + 1e-9)
             interest_capsule = scalar_factor * interest_capsule
 
-            # 需要Squash
             delta_weight = (item_moe_emb * interest_capsule.unsqueeze(1)).sum(dim=-1)  # batch_size * len * ins
             bij = bij + delta_weight
 
@@ -152,7 +147,6 @@ class MoERouteLayer(nn.Module):
             gates = noisy_gates
         else:
             gates = clean_gates
-        # gates = F.softmax(gates / self.tau, dim=-1)  # batch_size * seq_len * pool
         return gates
 
     def forward_item(self, item_emb):
@@ -232,8 +226,6 @@ class MultiInterest(SequentialRecommender):
     def _init_weights(self, module):
         """ Initialize the weights """
         if isinstance(module, (nn.Linear, nn.Embedding)):
-            # Slightly different from the TF version which uses truncated_normal for initialization
-            # cf https://github.com/pytorch/pytorch/pull/5617
             module.weight.data.normal_(mean=0.0, std=self.initializer_range)
         elif isinstance(module, nn.LayerNorm):
             module.bias.data.zero_()
@@ -267,10 +259,8 @@ class MultiInterest(SequentialRecommender):
         if self.stage == 'trans':
             item_emb = item_emb + self.item_embedding(item_seq)
 
-        # 过序列编码模块
         seq_output = self.seq_encode(item_seq, item_emb, item_seq_len)  # batch_size * seq_len * hidden_size
 
-        # 过稀疏化MoE模块
         interests, gates, aspect_mask = self.mmoe_layer.forward_sequence(seq_output,
                                                                          item_seq)  # batch_size * seq_len * topk * hidden_size
 
@@ -289,7 +279,6 @@ class MultiInterest(SequentialRecommender):
         item_seq_len = interaction['lengths']
         interests, moe_gates, aspect_mask = self.forward(item_seq, item_seq_len)  # bs * aspects * hidden_size
 
-        # Pretrain默认对比学习损失
         pos_items = interaction['labels']
         total_embs, item_gates = self.mmoe_layer.forward_item(
             self.moe_adaptor(self.plm_embedding[pos_items].to(self.device)))  # bs * aspects * hidden_size
@@ -422,10 +411,6 @@ class MultiInterest(SequentialRecommender):
         for _ in self.trm_encoder.parameters():
             _.requires_grad = False
 
-    def batch_step(self):
-        self.n_batch += 1
-        # self.mmoe_layer.tau = max(0.05, min(0.2, 1 / np.exp(self.n_batch / 100)))
-        self.mmoe_layer.tau = 1
 
     def seq_aug(self, item_seq, item_seq_len):
         item_seq = item_seq.cpu()
