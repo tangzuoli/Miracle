@@ -1,2 +1,2 @@
 # Miracle
-quick start is prepraring
+quick start is coming, the model is in multiInterest_final.py
