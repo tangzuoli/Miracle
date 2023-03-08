@@ -1,2 +1,2 @@
 # Miracle
-quick study is prepraring
+quick start is prepraring
