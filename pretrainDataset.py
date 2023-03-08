@@ -67,7 +67,6 @@ class PretrainDataloader:
 
                 line_list = line.split('\t')
 
-                # item id都需要+1， 为padding token留位置
                 user_id = int(line_list[0])
                 item_seq = line_list[1].split(' ')
                 item_seq = [int(item)+1 for item in item_seq]
