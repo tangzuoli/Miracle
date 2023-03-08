@@ -1,5 +1,5 @@
 # Miracle
-The model and trainer are ready, and the data processing is preparing
+The model and trainer are ready, and the data processing is preparing\n
 main.py: Entry File
 metrics.py: calculate the metrics
 miracle.py: model file
